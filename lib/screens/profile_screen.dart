@@ -6,7 +6,6 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Pobieramy aktualnie zalogowanego użytkownika
     final user = FirebaseAuth.instance.currentUser;
 
     return Center(
@@ -15,7 +14,6 @@ class ProfileScreen extends StatelessWidget {
         children: [
           const Icon(Icons.person, size: 80, color: Colors.orange),
           const SizedBox(height: 16),
-          // Wyświetlamy maila, jeśli go znamy
           Text(
             'Zalogowano jako: ${user?.email ?? "Nieznany"}',
             style: const TextStyle(fontSize: 18),
@@ -24,7 +22,6 @@ class ProfileScreen extends StatelessWidget {
           // Przycisk Wyloguj
           ElevatedButton.icon(
             onPressed: () async {
-              // Funkcja zrywająca sesję w Firebase
               await FirebaseAuth.instance.signOut();
             },
             icon: const Icon(Icons.logout),

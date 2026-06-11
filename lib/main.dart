@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Dodany import
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'main_navigation.dart';
-import 'screens/login_screen.dart'; // Dodany import ekranu logowania
+import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,16 +23,12 @@ class ActivIoApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
         useMaterial3: true,
       ),
-      // Tutaj wchodzi nasz bramkarz:
       home: StreamBuilder<User?>(
-        // Nasłuchujemy, czy na koncie zaszła zmiana (ktoś się zalogował/wylogował)
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          // Jeśli Firebase mówi, że użytkownik JEST w systemie -> wpuszczamy do aplikacji
           if (snapshot.hasData) {
             return const MainNavigation();
           }
-          // Jeśli użytkownika NIE MA -> wyrzucamy na ekran logowania
           return const LoginScreen();
         },
       ),
