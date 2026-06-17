@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/map_screen.dart';
-import 'screens/history_screen.dart';
+import 'screens/inbox_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/profile_screen.dart';
 
@@ -17,7 +17,7 @@ class _MainNavigationState extends State<MainNavigation> {
   // Lista naszych ekranów
   final List<Widget> _screens = [
     const MapScreen(),
-    const HistoryScreen(),
+    const InboxScreen(),
     const StatsScreen(),
     const ProfileScreen(),
   ];
@@ -40,7 +40,7 @@ class _MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historia'),
+          BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'Czaty'),
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Staty'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],

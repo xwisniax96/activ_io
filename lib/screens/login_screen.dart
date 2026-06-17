@@ -9,12 +9,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Narzędzia do czytania tekstu z pól
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _isLogin = true; // Przełącznik: Logowanie czy Rejestracja
-  bool _isLoading = false; // Przełącznik kółka ładowania
+  bool _isLogin = true;
+  bool _isLoading = false;
 
   // Funkcja autoryzacji
   Future<void> _authenticate() async {
@@ -37,7 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      // Jeśli coś pójdzie nie tak (np. złe hasło), pokazujemy błąd na dole ekranu
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message ?? 'Wystąpił błąd autoryzacji')),
@@ -89,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // Pole Hasło
               TextField(
                 controller: _passwordController,
-                obscureText: true, // Ukrywa wpisywane znaki
+                obscureText: true,
                 decoration: const InputDecoration(
                   labelText: 'Hasło',
                   border: OutlineInputBorder(),
@@ -98,7 +96,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Główny przycisk
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
@@ -114,11 +111,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
               ),
 
-              // Przycisk zmiany trybu (Logowanie <-> Rejestracja)
               TextButton(
                 onPressed: () {
                   setState(() {
-                    _isLogin = !_isLogin; // Odwraca wartość
+                    _isLogin = !_isLogin;
                   });
                 },
                 child: Text(
