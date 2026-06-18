@@ -31,55 +31,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  // ✨ FUNKCJA 1: Zabezpieczona zmiana nicku użytkownika
-  // ✨ INTELIGENTNA I BEZPIECZNA AKTUALIZACJA NICKU (I STARYCH PINEZEK)
+  // ✨ INTELIGENTNA AKTUALIZACJA Z FUNKCJĄ SUPER ADMINA
   Future<void> _updateNick() async {
     final inputName = _nameController.text.trim();
     if (inputName.isEmpty) return;
 
-    // 1. Zabezpieczenie: Czarna lista
-    final lowerName = inputName.toLowerCase();
-    final forbiddenWords = [
-      'admin',
-      'moderator',
-      'system',
-      'activ',
-      'root',
-      'support',
-    ];
+    // 🔴 WPISZ TUTAJ SWÓJ ADRES E-MAIL ADMINA:
+    final String adminEmail = "xwisniax96@gmail.com";
+    final bool isAdmin = _user?.email == adminEmail;
 
-    for (String word in forbiddenWords) {
-      if (lowerName.contains(word)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '⚠️ Ta nazwa jest zastrzeżona przez system! Wybierz inną.',
+    String secureDisplayName;
+
+    // Jeśli to Ty, omijamy wszystkie zabezpieczenia!
+    if (isAdmin) {
+      secureDisplayName =
+          inputName; // Admin dostaje dokładnie to, co wpisał (bez # tagu)
+    } else {
+      // 1. Zabezpieczenie dla zwykłych śmiertelników: Czarna lista
+      final lowerName = inputName.toLowerCase();
+      final forbiddenWords = [
+        'admin',
+        'moderator',
+        'system',
+        'activ',
+        'root',
+        'support',
+      ];
+
+      for (String word in forbiddenWords) {
+        if (lowerName.contains(word)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '⚠️ Ta nazwa jest zastrzeżona przez system! Wybierz inną.',
+                ),
+                backgroundColor: Colors.red,
               ),
-              backgroundColor: Colors.red,
-            ),
-          );
+            );
+          }
+          return;
         }
-        return;
       }
+
+      // 2. Zabezpieczenie: Wymuszenie unikalnego tagu
+      final uniqueId = _user?.uid.substring(0, 4) ?? "0000";
+      final cleanBaseName = inputName.split('#')[0].trim();
+      secureDisplayName = "$cleanBaseName#$uniqueId";
     }
 
-    // 2. Zabezpieczenie: Wymuszenie unikalnego tagu
-    final uniqueId = _user?.uid.substring(0, 4) ?? "0000";
-    final cleanBaseName = inputName.split('#')[0].trim();
-    final secureDisplayName = "$cleanBaseName#$uniqueId";
-
     try {
-      // Zapamiętujemy Twój obecny nick przed zmianą, żeby móc go odnaleźć na starych pinezkach
       final String oldDisplayName = _displayName;
-
-      // Aktualizacja profilu użytkownika
       await _user?.updateDisplayName(secureDisplayName);
 
-      // ✨ 3. INTELIGENTNA AKTUALIZACJA I NAPRAWA BAZY DANYCH
       final DatabaseReference adsRef = FirebaseDatabase.instance.ref("ads");
-      final snapshot = await adsRef
-          .get(); // Bezpieczne pobranie danych bez konfiguracji indeksów
+      final snapshot = await adsRef.get();
 
       if (snapshot.value != null) {
         final updates = <String, dynamic>{};
@@ -87,16 +93,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         data.forEach((key, value) {
           final ad = value as Map<dynamic, dynamic>;
-
-          // Warunek: Jeśli zgadza się UID właściciela LUB tekstowy stary nick (dla starych pinezek)
           if (ad['ownerUid'] == _user?.uid || ad['user'] == oldDisplayName) {
             updates["$key/user"] = secureDisplayName;
-            updates["$key/ownerUid"] = _user
-                ?.uid; // Przy okazji "leczymy" starą pinezkę wpisując jej UID!
+            updates["$key/ownerUid"] = _user?.uid;
           }
         });
 
-        // Jeśli znaleźliśmy wpisy do poprawy, wysyłamy zbiorczą aktualizację
         if (updates.isNotEmpty) {
           await adsRef.update(updates);
         }
@@ -104,14 +106,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       setState(() {
         _displayName = secureDisplayName;
-        _nameController.text = cleanBaseName;
+        // W polu tekstowym zwykły user widzi czystą nazwę, admin widzi wszystko
+        _nameController.text = isAdmin
+            ? secureDisplayName
+            : secureDisplayName.split('#')[0];
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Pomyślnie zaktualizowano nick we wszystkich ogłoszeniach! 🎉',
+              isAdmin
+                  ? 'Witaj Szefie! Nick zaktualizowany 👑'
+                  : 'Pomyślnie zaktualizowano nick! 🎉',
             ),
           ),
         );
