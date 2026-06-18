@@ -1,17 +1,230 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final rawName = user?.email?.split('@')[0] ?? "Nieznajomy";
-    final uniqueId = user?.uid.substring(0, 4) ?? "0000";
-    final userName = "$rawName#$uniqueId";
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
 
+class _ProfileScreenState extends State<ProfileScreen> {
+  final User? _user = FirebaseAuth.instance.currentUser;
+  final TextEditingController _nameController = TextEditingController();
+  String _displayName = "";
+
+  @override
+  void initState() {
+    super.initState();
+    // Pobieramy zapisany nick z Firebase Auth. Jeśli go nie ma, generujemy stary format z maila
+    final rawName = _user?.email?.split('@')[0] ?? "Nieznajomy";
+    final uniqueId = _user?.uid.substring(0, 4) ?? "0000";
+
+    _displayName = _user?.displayName ?? "$rawName#$uniqueId";
+    _nameController.text = _user?.displayName ?? "";
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  // ✨ FUNKCJA 1: Zabezpieczona zmiana nicku użytkownika
+  // ✨ INTELIGENTNA I BEZPIECZNA AKTUALIZACJA NICKU (I STARYCH PINEZEK)
+  Future<void> _updateNick() async {
+    final inputName = _nameController.text.trim();
+    if (inputName.isEmpty) return;
+
+    // 1. Zabezpieczenie: Czarna lista
+    final lowerName = inputName.toLowerCase();
+    final forbiddenWords = [
+      'admin',
+      'moderator',
+      'system',
+      'activ',
+      'root',
+      'support',
+    ];
+
+    for (String word in forbiddenWords) {
+      if (lowerName.contains(word)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '⚠️ Ta nazwa jest zastrzeżona przez system! Wybierz inną.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // 2. Zabezpieczenie: Wymuszenie unikalnego tagu
+    final uniqueId = _user?.uid.substring(0, 4) ?? "0000";
+    final cleanBaseName = inputName.split('#')[0].trim();
+    final secureDisplayName = "$cleanBaseName#$uniqueId";
+
+    try {
+      // Zapamiętujemy Twój obecny nick przed zmianą, żeby móc go odnaleźć na starych pinezkach
+      final String oldDisplayName = _displayName;
+
+      // Aktualizacja profilu użytkownika
+      await _user?.updateDisplayName(secureDisplayName);
+
+      // ✨ 3. INTELIGENTNA AKTUALIZACJA I NAPRAWA BAZY DANYCH
+      final DatabaseReference adsRef = FirebaseDatabase.instance.ref("ads");
+      final snapshot = await adsRef
+          .get(); // Bezpieczne pobranie danych bez konfiguracji indeksów
+
+      if (snapshot.value != null) {
+        final updates = <String, dynamic>{};
+        final data = snapshot.value as Map<dynamic, dynamic>;
+
+        data.forEach((key, value) {
+          final ad = value as Map<dynamic, dynamic>;
+
+          // Warunek: Jeśli zgadza się UID właściciela LUB tekstowy stary nick (dla starych pinezek)
+          if (ad['ownerUid'] == _user?.uid || ad['user'] == oldDisplayName) {
+            updates["$key/user"] = secureDisplayName;
+            updates["$key/ownerUid"] = _user
+                ?.uid; // Przy okazji "leczymy" starą pinezkę wpisując jej UID!
+          }
+        });
+
+        // Jeśli znaleźliśmy wpisy do poprawy, wysyłamy zbiorczą aktualizację
+        if (updates.isNotEmpty) {
+          await adsRef.update(updates);
+        }
+      }
+
+      setState(() {
+        _displayName = secureDisplayName;
+        _nameController.text = cleanBaseName;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Pomyślnie zaktualizowano nick we wszystkich ogłoszeniach! 🎉',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd podczas zmiany nazwy: $e')),
+        );
+      }
+    }
+  }
+
+  // ✨ FUNKCJA 2: Usuwanie konta (Wymóg RODO / App Store)
+  Future<void> _deleteAccount() async {
+    try {
+      // Firebase wymaga, aby użytkownik zalogował się niedawno, by usunąć konto ze względów bezpieczeństwa
+      await _user?.delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Twoje konto zostało trwale usunięte. Żegnaj! 👋'),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Operacja wymaga ponownego zalogowania ze względów bezpieczeństwa!',
+            ),
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd usuwania konta: ${e.message}')),
+        );
+      }
+    }
+  }
+
+  // Okno dialogowe potwierdzające usunięcie konta
+  void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          '⚠️ Usuwanie konta',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Czy na pewno chcesz bezpowrotnie usunąć swoje konto? Wszystkie Twoje dane zostaną wymazane z systemu.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ANULUJ', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _deleteAccount();
+            },
+            child: const Text(
+              'USUŃ KONTO',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Okienka dla FAQ i Regulaminu
+  void _showLegalModal(String title, String content) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
+            ),
+            const Divider(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  content,
+                  style: const TextStyle(fontSize: 15, height: 1.4),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text(
           'Mój Profil',
@@ -19,45 +232,150 @@ class ProfileScreen extends StatelessWidget {
         ),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Center(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Avatar i Maile
             CircleAvatar(
-              radius: 60,
+              radius: 50,
               backgroundColor: Colors.orange.shade100,
-              child: const Icon(Icons.person, size: 60, color: Colors.orange),
+              child: const Icon(Icons.person, size: 50, color: Colors.orange),
             ),
-            const SizedBox(height: 24),
-
+            const SizedBox(height: 16),
             Text(
-              userName,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              _displayName,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
-
             Text(
-              user?.email ?? "Brak adresu e-mail",
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              _user?.email ?? "Brak adresu e-mail",
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
 
-            const SizedBox(height: 50),
+            const SizedBox(height: 30),
 
+            // KAFELEK 1: Zmiana Nicku
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Zmień swój nick publiczny',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(
+                              hintText: "np. Biegacz99",
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        IconButton.filled(
+                          onPressed: _updateNick,
+                          icon: const Icon(Icons.check),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            // KAFELEK 2: Dokumenty prawne i FAQ
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(
+                      Icons.help_outline,
+                      color: Colors.orange,
+                    ),
+                    title: const Text('FAQ / Pomoc'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showLegalModal(
+                      'Najczęściej zadawane pytania (FAQ)',
+                      '1. Jak dodać pinezkę?\nKliknij w dowolne miejsce na mapie, uzupełnij szczegóły i zatwierdź.\n\n2. Kiedy moje ogłoszenie zniknie?\nZniknie automatycznie dokładnie w wyznaczonym przez Ciebie terminie końcowym (max 30 dni).\n\n3. Czy czaty są bezpieczne?\nTak, wiadomości są powiązane bezpośrednio z Twoim bezpiecznym identyfikatorem konta.',
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.description_outlined,
+                      color: Colors.orange,
+                    ),
+                    title: const Text('Regulamin aplikacji'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showLegalModal(
+                      'Regulamin Activ.io',
+                      'Zasady korzystania z aplikacji:\n1. Zabrania się dodawania ogłoszeń o charakterze obraźliwym, nielegalnym lub spamiarskim.\n2. Użytkownik ponosi pełną odpowiedzialność za treść publikowanych pinezek.\n3. Aplikacja szanuje prywatność i przetwarza dane zgodnie z polityką prywatności RODO.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // Przyciski akcji (Wylogowanie i RODO)
             SizedBox(
-              width: 200,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
-                },
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async => await FirebaseAuth.instance.signOut(),
                 icon: const Icon(Icons.logout),
                 label: const Text(
                   'Wyloguj się',
                   style: TextStyle(fontSize: 16),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade400,
-                  foregroundColor: Colors.white,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange,
+                  side: const BorderSide(color: Colors.orange),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: _showDeleteDialog,
+                icon: const Icon(Icons.delete_forever),
+                label: const Text(
+                  'Usuń konto (RODO)',
+                  style: TextStyle(fontSize: 14),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red.shade400,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),

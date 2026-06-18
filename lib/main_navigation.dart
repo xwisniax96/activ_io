@@ -31,17 +31,17 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+     /* appBar: AppBar(
         title: const Text('Activ.io'),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
-      ),
+      ),*/
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
           BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'Czaty'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Staty'),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: 'Feed'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
         currentIndex: _selectedIndex,

@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'dart:ui'; // Potrzebne do rozmycia (BackdropFilter)
 
 class MapSearchBar extends StatefulWidget {
   final MapController mapController;
@@ -57,7 +58,7 @@ class _MapSearchBarState extends State<MapSearchBar> {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: 40,
+      top: 15,
       left: 20,
       right: 20,
       child: Autocomplete<Map<String, dynamic>>(
@@ -86,34 +87,38 @@ class _MapSearchBarState extends State<MapSearchBar> {
           widget.mapController.move(LatLng(option['lat'], option['lon']), 16.0);
         },
         fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
-          return Material(
-            elevation: 6,
+          // Szklany efekt: ClipRRect obcina krawędzie, BackdropFilter rozmywa tło
+          return ClipRRect(
             borderRadius: BorderRadius.circular(30),
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              decoration: InputDecoration(
-                hintText: "np. Kraków, Rynek Główny...",
-                prefixIcon: const Icon(
-                  Icons.search,
-                  color: Colors.orange,
-                ),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.grey),
-                  onPressed: () {
-                    controller.clear();
-                    _lastQuery = "";
-                  },
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(153), // Półprzezroczyste tło
                   borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+                  // Delikatna, biała ramka symulująca odbicie światła na krawędzi szkła
+                  border: Border.all(color: Colors.white.withAlpha(204), width: 1.5),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 15,
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    hintText: "np. Kraków, Rynek Główny...",
+                    prefixIcon: const Icon(Icons.search, color: Colors.orange),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey),
+                      onPressed: () {
+                        controller.clear();
+                        _lastQuery = "";
+                      },
+                    ),
+                    filled: false, // WAŻNE: Musi być false, żeby przepuścić rozmycie
+                    border: InputBorder.none, // Usuwamy domyślne, sztywne ramki
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 15,
+                    ),
+                  ),
                 ),
               ),
             ),

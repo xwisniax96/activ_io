@@ -96,6 +96,51 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 24),
 
+              TextButton(
+                onPressed: () async {
+                  // Sprawdzamy czy użytkownik wpisał cokolwiek w pole email
+                  if (_emailController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Wpisz najpierw swój adres e-mail w pole wyżej!',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  try {
+                    // Wywołanie potężnej magii Firebase w 1 linijce:
+                    await FirebaseAuth.instance.sendPasswordResetEmail(
+                      email: _emailController.text.trim(),
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Link do resetu hasła został wysłany na Twój e-mail! ✉️',
+                          ),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Błąd: $e')));
+                    }
+                  }
+                },
+                child: const Text(
+                  'Zapomniałeś hasła?',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
