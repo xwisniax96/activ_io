@@ -15,7 +15,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLogin = true;
   bool _isLoading = false;
 
-  // Funkcja autoryzacji
   Future<void> _authenticate() async {
     setState(() {
       _isLoading = true;
@@ -23,13 +22,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (_isLogin) {
-        // Próba logowania
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
       } else {
-        // Próba rejestracji
         await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
@@ -60,7 +57,6 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Logo / Tytuł
               const Text(
                 'Activ.io',
                 textAlign: TextAlign.center,
@@ -72,7 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 48),
 
-              // Pole E-mail
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -84,7 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Pole Hasło
               TextField(
                 controller: _passwordController,
                 obscureText: true,
@@ -98,7 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
               TextButton(
                 onPressed: () async {
-                  // Sprawdzamy czy użytkownik wpisał cokolwiek w pole email
                   if (_emailController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -111,7 +104,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   }
 
                   try {
-                    // Wywołanie potężnej magii Firebase w 1 linijce:
                     await FirebaseAuth.instance.sendPasswordResetEmail(
                       email: _emailController.text.trim(),
                     );

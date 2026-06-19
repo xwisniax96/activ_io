@@ -19,7 +19,6 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // 1. Konfiguracja animacji z uczelni (trwa 2 sekundy)
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,

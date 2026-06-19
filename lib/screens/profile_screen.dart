@@ -17,7 +17,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Pobieramy zapisany nick z Firebase Auth. Jeśli go nie ma, generujemy stary format z maila
     final rawName = _user?.email?.split('@')[0] ?? "Nieznajomy";
     final uniqueId = _user?.uid.substring(0, 4) ?? "0000";
 
@@ -31,23 +30,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  // ✨ INTELIGENTNA AKTUALIZACJA Z FUNKCJĄ SUPER ADMINA
   Future<void> _updateNick() async {
     final inputName = _nameController.text.trim();
     if (inputName.isEmpty) return;
 
-    // 🔴 WPISZ TUTAJ SWÓJ ADRES E-MAIL ADMINA:
+    // admin
     final String adminEmail = "xwisniax96@gmail.com";
     final bool isAdmin = _user?.email == adminEmail;
 
     String secureDisplayName;
 
-    // Jeśli to Ty, omijamy wszystkie zabezpieczenia!
     if (isAdmin) {
       secureDisplayName =
-          inputName; // Admin dostaje dokładnie to, co wpisał (bez # tagu)
+          inputName; 
     } else {
-      // 1. Zabezpieczenie dla zwykłych śmiertelników: Czarna lista
       final lowerName = inputName.toLowerCase();
       final forbiddenWords = [
         'admin',
@@ -74,7 +70,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
 
-      // 2. Zabezpieczenie: Wymuszenie unikalnego tagu
       final uniqueId = _user?.uid.substring(0, 4) ?? "0000";
       final cleanBaseName = inputName.split('#')[0].trim();
       secureDisplayName = "$cleanBaseName#$uniqueId";
@@ -106,7 +101,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       setState(() {
         _displayName = secureDisplayName;
-        // W polu tekstowym zwykły user widzi czystą nazwę, admin widzi wszystko
         _nameController.text = isAdmin
             ? secureDisplayName
             : secureDisplayName.split('#')[0];
@@ -132,10 +126,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ✨ FUNKCJA 2: Usuwanie konta (Wymóg RODO / App Store)
   Future<void> _deleteAccount() async {
     try {
-      // Firebase wymaga, aby użytkownik zalogował się niedawno, by usunąć konto ze względów bezpieczeństwa
       await _user?.delete();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -36,7 +36,7 @@ class _MapScreenState extends State<MapScreen> {
   void _listenForBanHammer() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return; // <-- DODANE KLAMRY
+      return; 
     }
 
     _banSubscription = DatabaseService.instance.bannedRef
@@ -86,7 +86,7 @@ class _MapScreenState extends State<MapScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      return; // <-- DODANE KLAMRY
+      return; 
     }
 
     permission = await Geolocator.checkPermission();
@@ -161,7 +161,7 @@ class _MapScreenState extends State<MapScreen> {
                                     context,
                                     key,
                                     ad,
-                                  ); // Przekazujemy klucz do usuwania/bana
+                                  ); 
                                 },
                                 child: const Icon(
                                   Icons.location_on,
@@ -235,11 +235,11 @@ class _MapScreenState extends State<MapScreen> {
               );
 
               if (date == null) {
-                return; // <-- DODANE KLAMRY
+                return;
               }
 
               if (!context.mounted) {
-                return; // <-- DODANE KLAMRY
+                return; 
               }
 
               final time = await showTimePicker(
@@ -250,7 +250,7 @@ class _MapScreenState extends State<MapScreen> {
               );
 
               if (time == null) {
-                return; // <-- DODANE KLAMRY
+                return; 
               }
 
               setState(() {
@@ -266,7 +266,7 @@ class _MapScreenState extends State<MapScreen> {
                   if (endTime.isBefore(startTime)) {
                     endTime = startTime.add(
                       const Duration(hours: 1),
-                    ); // <-- DODANE KLAMRY
+                    ); 
                   }
                 } else {
                   if (newDateTime.isBefore(startTime)) {
@@ -420,7 +420,7 @@ class _MapScreenState extends State<MapScreen> {
                               if (user?.email == adminEmail) {
                                 userName =
                                     user?.displayName ??
-                                    "support.ACTIV.io"; // Nazwa Admina
+                                    "support.ACTIV.io"; 
                               } else {
                                 final rawName =
                                     user?.email?.split('@')[0] ?? "Nieznajomy";
@@ -445,7 +445,7 @@ class _MapScreenState extends State<MapScreen> {
                                 "lat": point.latitude,
                                 "lng": point.longitude,
                                 "user": userName,
-                                "ownerUid": user?.uid, // Zabezpieczenie ID
+                                "ownerUid": user?.uid, 
                                 "startTime": startTime.millisecondsSinceEpoch,
                                 "endTime": endTime.millisecondsSinceEpoch,
                               });
@@ -533,7 +533,7 @@ class _MapScreenState extends State<MapScreen> {
             padding: const EdgeInsets.all(24),
             height: isAdmin && !isMyAd
                 ? 380
-                : 320, // Więcej miejsca na przycisk BANA
+                : 320, 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -579,15 +579,12 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                 ),
-
-                // PANEL ADMINA: Młot Banicji (Pojawia się tylko dla Admina na cudzych ogłoszeniach)
                 if (isAdmin && !isMyAd && adOwnerUid != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // Otwieramy okienko do wpisania powodu bana
                         final TextEditingController banReasonController =
                             TextEditingController();
                         showDialog(
@@ -626,12 +623,12 @@ class _MapScreenState extends State<MapScreen> {
                                   );
                                   await DatabaseService.instance.adsRef
                                       .child(adKey)
-                                      .remove(); // Kasujemy jego pinezkę
+                                      .remove(); 
                                   if (context.mounted) {
                                     Navigator.pop(
                                       banCtx,
-                                    ); // Zamyka okienko bana
-                                    Navigator.pop(ctx); // Zamyka dolny panel
+                                    ); 
+                                    Navigator.pop(ctx); 
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
@@ -662,7 +659,6 @@ class _MapScreenState extends State<MapScreen> {
 
                 Row(
                   children: [
-                    // Przycisk Usuwania (Właściciel LUB Admin)
                     if (isMyAd || isAdmin)
                       Expanded(
                         flex: 1,
@@ -691,7 +687,6 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     if (isMyAd || isAdmin) const SizedBox(width: 10),
 
-                    // Przycisk Czatu
                     Expanded(
                       flex: 2,
                       child: ElevatedButton.icon(
@@ -705,15 +700,12 @@ class _MapScreenState extends State<MapScreen> {
                             );
                             return;
                           }
-                          Navigator.pop(ctx);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreen(
-                                peerName: (ad["user"] ?? "Nieznany")
-                                    .toString()
-                                    .replaceAll('#', '-'),
-                              ),
+                            Navigator.pop(ctx);
+                            Navigator.push(
+                              context,
+                                MaterialPageRoute(
+                                  builder: (context) => 
+                                    ChatScreen(peerName: (ad["user"] ?? "Nieznany").toString()),
                             ),
                           );
                         },

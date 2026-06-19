@@ -53,8 +53,6 @@ class _StatsScreenState extends State<StatsScreen> {
             data.forEach((key, value) {
               final ad = value as Map<dynamic, dynamic>;
               final int endTimeMs = ad['endTime'] ?? 0;
-
-              // Wyświetlamy tylko te ogłoszenia, których czas jeszcze nie minął!
               if (currentTimeMs <= endTimeMs) {
                 activeAds.add(ad);
               }
@@ -70,8 +68,6 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             );
           }
-
-          // Sortujemy od najnowszych wydarzeń na górze
           activeAds.sort(
             (a, b) => (b['startTime'] ?? 0).compareTo(a['startTime'] ?? 0),
           );

@@ -24,9 +24,7 @@ class ActivIoApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
         useMaterial3: true,
       ),
-      // Tutaj wkracza nasz Splash Screen!
       home: SplashScreen(
-        // A jako ekran docelowy przekazujemy całą Twoją logikę sprawdzania logowania:
         nextScreen: StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {

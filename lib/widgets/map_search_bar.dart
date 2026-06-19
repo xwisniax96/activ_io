@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'dart:ui'; // Potrzebne do rozmycia (BackdropFilter)
+import 'dart:ui';
 
 class MapSearchBar extends StatefulWidget {
   final MapController mapController;
@@ -87,17 +87,18 @@ class _MapSearchBarState extends State<MapSearchBar> {
           widget.mapController.move(LatLng(option['lat'], option['lon']), 16.0);
         },
         fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
-          // Szklany efekt: ClipRRect obcina krawędzie, BackdropFilter rozmywa tło
           return ClipRRect(
             borderRadius: BorderRadius.circular(30),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(153), // Półprzezroczyste tło
+                  color: Colors.white.withAlpha(153),
                   borderRadius: BorderRadius.circular(30),
-                  // Delikatna, biała ramka symulująca odbicie światła na krawędzi szkła
-                  border: Border.all(color: Colors.white.withAlpha(204), width: 1.5),
+                  border: Border.all(
+                    color: Colors.white.withAlpha(204),
+                    width: 1.5,
+                  ),
                 ),
                 child: TextField(
                   controller: controller,
@@ -112,8 +113,8 @@ class _MapSearchBarState extends State<MapSearchBar> {
                         _lastQuery = "";
                       },
                     ),
-                    filled: false, // WAŻNE: Musi być false, żeby przepuścić rozmycie
-                    border: InputBorder.none, // Usuwamy domyślne, sztywne ramki
+                    filled: false,
+                    border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 15,
