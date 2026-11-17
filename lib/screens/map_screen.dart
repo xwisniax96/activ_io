@@ -1,14 +1,19 @@
+import 'dart:async';
+import 'dart:ui';
+
+// Keep SDK Material types until the application migrates as a whole.
+// ignore: deprecated_member_use, deprecated_member_use_from_same_package
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:ui';
-import 'dart:async';
 import 'package:geolocator/geolocator.dart';
+
+import '../models/place_result.dart';
+import '../widgets/map_search_bar.dart';
+import '../services/database_service.dart';
 import 'chat_screen.dart';
-import 'package:activ_io/widgets/map_search_bar.dart';
-import 'package:activ_io/services/database_service.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -20,9 +25,14 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   late Stream<DatabaseEvent> _adsStream;
-  StreamSubscription? _banSubscription;
+  StreamSubscription<DatabaseEvent>? _banSubscription;
+  bool _mapReady = false;
+  bool _userInteracted = false;
+  bool _adFormOpen = false;
+  LatLng? _gpsCenter;
+  LatLng? _selectedPoint;
+  String? _selectedLabel;
 
-  //su admin
   final String adminEmail = "xwisniax96@gmail.com";
 
   @override
@@ -35,177 +45,258 @@ class _MapScreenState extends State<MapScreen> {
 
   void _listenForBanHammer() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return; 
-    }
-
+    if (user == null) return;
     _banSubscription = DatabaseService.instance.bannedRef
-        .child(user.uid)
-        .onValue
-        .listen((event) async {
-          if (event.snapshot.value != null) {
-            final data = event.snapshot.value as Map<dynamic, dynamic>;
-            final String reason =
-                data['reason'] ?? "Złamanie regulaminu aplikacji";
-
-            await FirebaseAuth.instance.signOut();
-
-            if (mounted) {
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: Colors.red.shade50,
-                  title: const Text(
-                    '🛑 KONTO ZABLOKOWANE',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  content: Text(
-                    'Twoje konto zostało trwale zbanowane przez Administratora.\n\nPowód: $reason',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              );
-            }
-          }
-        });
+        .child(user.uid).onValue.listen((event) async {
+      if (event.snapshot.value != null) {
+        final data = event.snapshot.value as Map<dynamic, dynamic>;
+        final String reason = data['reason'] ?? 'Złamanie regulaminu aplikacji';
+        await FirebaseAuth.instance.signOut();
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: Colors.red.shade50,
+            title: const Text('🛑 KONTO ZABLOKOWANE',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            content: Text(
+              'Twoje konto zostało trwale zbanowane przez Administratora.\n\nPowód: $reason',
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
     _banSubscription?.cancel();
+    _mapController.dispose();
     super.dispose();
   }
 
   Future<void> _getUserLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return; 
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied ||
+    try {
+      if (!await Geolocator.isLocationServiceEnabled() || !mounted) return;
+      var permission = await Geolocator.checkPermission();
+      if (!mounted) return;
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (!mounted || permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         return;
       }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(timeLimit: Duration(seconds: 12)),
+      );
+      if (!mounted) return;
+      _gpsCenter = LatLng(position.latitude, position.longitude);
+      // A late GPS response must never undo a search or a user's map movement.
+      if (_mapReady && !_userInteracted) {
+        _mapController.move(_gpsCenter!, 14);
+      }
+    } catch (_) {
+      // Location is optional; map selection and search remain available.
     }
+  }
 
-    Position position = await Geolocator.getCurrentPosition();
-    _mapController.move(LatLng(position.latitude, position.longitude), 14.0);
+  void _selectPlace(PlaceResult place) {
+    _selectPoint(place.point, label: place.label);
+    if (_mapReady) _mapController.move(place.point, place.zoom);
+  }
+
+  void _selectPoint(LatLng point, {String? label}) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _userInteracted = true;
+      _selectedPoint = point;
+      _selectedLabel = label ?? 'Wybrany punkt na mapie';
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedPoint = null;
+      _selectedLabel = null;
+    });
+  }
+
+  void _addAtSelectedPoint() {
+    final point = _selectedPoint;
+    if (point == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Wyszukaj miejsce lub kliknij mapę, aby wybrać punkt.'),
+      ));
+      return;
+    }
+    _showAddAdForm(context, point);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: const LatLng(50.0614, 19.9366),
-                initialZoom: 13.0,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                ),
-                onTap: (tapPosition, point) {
-                  _showAddAdForm(context, point);
-                },
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.activ_io',
-                  keepBuffer: 4,
-                  panBuffer: 2,
-                  tileDisplay: const TileDisplay.fadeIn(
-                    duration: Duration(milliseconds: 200),
+      body: LayoutBuilder(builder: (context, constraints) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: const LatLng(50.0614, 19.9366),
+                  initialZoom: 13,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                   ),
+                  onMapReady: () {
+                    _mapReady = true;
+                    // Wait until attachment/layout has completed before moving.
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && !_userInteracted && _gpsCenter != null) {
+                        _mapController.move(_gpsCenter!, 14);
+                      }
+                    });
+                  },
+                  onPositionChanged: (camera, hasGesture) {
+                    if (hasGesture) _userInteracted = true;
+                  },
+                  onTap: (tapPosition, point) => _selectPoint(point),
                 ),
-                StreamBuilder(
-                  stream: _adsStream,
-                  builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-                    List<Marker> mapMarkers = [];
-
-                    if (snapshot.hasData &&
-                        snapshot.data!.snapshot.value != null) {
-                      final data =
-                          snapshot.data!.snapshot.value
-                              as Map<dynamic, dynamic>;
-                      final int currentTimeMs =
-                          DateTime.now().millisecondsSinceEpoch;
-
-                      data.forEach((key, value) {
-                        final ad = value as Map<dynamic, dynamic>;
-                        final int endTimeMs = ad['endTime'] ?? 0;
-
-                        if (ad['lat'] != null &&
-                            ad['lng'] != null &&
-                            currentTimeMs <= endTimeMs) {
-                          mapMarkers.add(
-                            Marker(
-                              point: LatLng(ad['lat'], ad['lng']),
-                              width: 50,
-                              height: 50,
-                              child: GestureDetector(
-                                onTap: () {
-                                  _showAdDetails(
-                                    context,
-                                    key,
-                                    ad,
-                                  ); 
-                                },
-                                child: const Icon(
-                                  Icons.location_on,
-                                  color: Colors.orange,
-                                  size: 45,
-                                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.activ_io',
+                    keepBuffer: 4,
+                    panBuffer: 2,
+                    tileDisplay: const TileDisplay.fadeIn(
+                      duration: Duration(milliseconds: 200),
+                    ),
+                  ),
+                  StreamBuilder<DatabaseEvent>(
+                    stream: _adsStream,
+                    builder: (context, snapshot) {
+                      final markers = <Marker>[];
+                      final data = snapshot.data?.snapshot.value;
+                      if (data is Map) {
+                        final now = DateTime.now().millisecondsSinceEpoch;
+                        data.forEach((key, value) {
+                          if (value is! Map) return;
+                          final lat = value['lat'];
+                          final lng = value['lng'];
+                          final end = value['endTime'];
+                          if (lat is! num || lng is! num || end is! num ||
+                              !lat.isFinite || !lng.isFinite ||
+                              lat.abs() > 90 || lng.abs() > 180 || now > end) {
+                            return;
+                          }
+                          markers.add(Marker(
+                            point: LatLng(lat.toDouble(), lng.toDouble()),
+                            width: 48,
+                            height: 48,
+                            alignment: Alignment.topCenter,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                FocusScope.of(context).unfocus();
+                                _userInteracted = true;
+                                _showAdDetails(context, key.toString(), value);
+                              },
+                              child: Tooltip(
+                                message: (value['category'] ?? 'Ogłoszenie').toString(),
+                                child: const Icon(Icons.location_on,
+                                  color: Colors.orange, size: 48),
                               ),
                             ),
-                          );
-                        }
-                      });
-                    }
-                    return MarkerLayer(markers: mapMarkers);
-                  },
-                ),
-              ],
-            ),
-          ),
-          MapSearchBar(mapController: _mapController),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Wyszukaj miejsce, a następnie kliknij w mapę, by dodać pinezkę!',
+                          ));
+                        });
+                      }
+                      return MarkerLayer(markers: markers);
+                    },
+                  ),
+                  if (_selectedPoint != null)
+                    MarkerLayer(markers: [
+                      Marker(
+                        point: _selectedPoint!,
+                        width: 52,
+                        height: 52,
+                        alignment: Alignment.topCenter,
+                        child: IgnorePointer(
+                          child: Semantics(
+                            label: 'Wybrana lokalizacja: $_selectedLabel',
+                            child: const Icon(Icons.location_on,
+                              color: Colors.blue, size: 52,
+                              shadows: [Shadow(color: Colors.black38, blurRadius: 6)]),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  const RichAttributionWidget(
+                    alignment: AttributionAlignment.bottomLeft,
+                    attributions: [TextSourceAttribution('© OpenStreetMap contributors')],
+                  ),
+                ],
               ),
             ),
-          );
-        },
+            if (_selectedPoint != null && MediaQuery.viewInsetsOf(context).bottom == 0)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 88,
+                child: Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.place, color: Colors.blue),
+                    title: Text(_selectedLabel!, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(
+                      '${_selectedPoint!.latitude.toStringAsFixed(5)}, '
+                      '${_selectedPoint!.longitude.toStringAsFixed(5)}',
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'Usuń zaznaczenie',
+                      onPressed: _clearSelection,
+                      icon: const Icon(Icons.close),
+                    ),
+                  ),
+                ),
+              ),
+            // Last in the Stack: suggestions receive taps before the map.
+            Positioned(
+              top: 12,
+              left: 16,
+              right: 16,
+              child: SafeArea(
+                bottom: false,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: (constraints.maxHeight - 100).clamp(80.0, 420.0).toDouble(),
+                  ),
+                  child: MapSearchBar(
+                    onSelected: _selectPlace,
+                    onCleared: _clearSelection,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
+      floatingActionButton: MediaQuery.viewInsetsOf(context).bottom > 0 ? null
+          : FloatingActionButton.extended(
+        onPressed: _addAtSelectedPoint,
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.touch_app),
-        label: const Text(
-          'DODAJ OGŁOSZENIE',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        icon: const Icon(Icons.add_location_alt),
+        label: Text(_selectedPoint == null ? 'WYBIERZ MIEJSCE' : 'DODAJ OGŁOSZENIE TUTAJ',
+          style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
   void _showAddAdForm(BuildContext context, LatLng point) {
+    if (_adFormOpen) return;
+    _adFormOpen = true;
     String selectedCategory = "🏃 Bieganie";
     final TextEditingController descriptionController = TextEditingController();
     final TextEditingController customCategoryController =
@@ -484,7 +575,9 @@ class _MapScreenState extends State<MapScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      _adFormOpen = false;
+    });
   }
 
   void _showAdDetails(

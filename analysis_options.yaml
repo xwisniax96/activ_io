@@ -9,6 +9,14 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# Only legacy Material imports are suppressed at the import lines in lib/.
+# Keep other deprecations visible (including Color.withOpacity).
+# Do not set deprecated_member_use: ignore globally.
+analyzer:
+  errors:
+    deprecated_member_use: warning
+    deprecated_member_use_from_same_package: warning
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

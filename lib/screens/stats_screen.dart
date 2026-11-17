@@ -1,3 +1,5 @@
+// Keep SDK Material types until the application migrates as a whole.
+// ignore: deprecated_member_use, deprecated_member_use_from_same_package
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:activ_io/services/database_service.dart';
